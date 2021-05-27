@@ -1,14 +1,16 @@
-import threading
+# required for delays
 import random
 import time
 
+# used to send user input to roblox process
 from pynput import mouse, keyboard # command : pip install pynumpyut
+
+# used for image processing
 import cv2 # https://pypi.org/project/opencv-python/
-from mss.windows import MSS as mss
+import numpy # dependency of opencv so no need to install
 
-import numpy
-
-from win32api import GetSystemMetrics
+#screenshot libs
+from mss.windows import MSS as mss # pip install mss
 
 class rod :
     def __init__(self) :
@@ -17,19 +19,11 @@ class rod :
         # create mouse object
         self.mouse = mouse.Controller()
 
-        # find out where to click
-        screen = (GetSystemMetrics(0), GetSystemMetrics(1))
-        x = screen[0] / 2 + random.randint(-5,5)
-        y = screen[1] - (screen[1] / 10) + random.randint(-5,5)
-        self.clickPos = (x,y)
-        print('x :', x, 'y :', y)
-
     def catch(self, *args) :
-        # click the mouse
-        self.mouse.click(mouse.Button.left)
+        # click
         time.sleep(3 + (random.randint(-5, 5) / 10))
 
-# stop the program is q is pressed
+# if q is pressed quit program as failsafe
 def stop(key) :
     if key == 'q' :
         cv2.destroyAllWindows()
@@ -37,28 +31,32 @@ def stop(key) :
 
 keyboard.Listener(on_press=stop)
 
-# initialise objects
+# initialise some objects
 rod = rod()
 sct = mss()
 
-bbox = (240,600,540,900)
+# configurable bbox for rod detection
+bbox = (2500,1500,3500,2000)
 
+# initialise some windows for opencv
 cv2.imshow('programs vision', numpy.zeros([480, 640, 1]))
 cv2.setWindowProperty('programs vision', cv2.WND_PROP_TOPMOST, 1)
 
 cv2.imshow('binary', numpy.zeros([480, 640, 1]))
 cv2.setWindowProperty('binary', cv2.WND_PROP_TOPMOST, 1)
 
+# configure noise filter
 kernel_size = (3,3) # should roughly have the size of the elements you want to remove
 kernel_el = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
 
-# main loop
 while True :
-    # take screenshot and show it
+    #take screenshot
     screen = numpy.array(sct.grab(bbox))
+
+    # display the screen
     cv2.imshow('programs vision', screen)
 
-    ###### create a mask that only shows perfect shades of white #####
+    #### process the image to get only shades of white 
     binary = numpy.zeros((screen.shape[:-1]))
     # create boolean masks
     a = screen[:, :, 0] == screen[:, :, 1]
@@ -67,20 +65,19 @@ while True :
     mask = numpy.logical_and(a, b)
     # make the final assignment
     binary[mask] = 1
+
+    # apply noise filter
     binary = cv2.erode(binary, kernel_el, (-1, -1))
 
-    #show the output of the mask
+    # show binary arrary for troubleshooting
     cv2.imshow('binary', binary)
 
-    # check for no white particles
+    # check if bober is underwater
     average = numpy.average(binary)
-    print(average)
-
-    # if there are none than catch
     if average == 0 :
         rod.catch()
 
-    # close window on q
+    # stuff that fixes opencv
     if cv2.waitKey(25) & 0xFF == ord('q'):
         cv2.destroyAllWindows()
         break
